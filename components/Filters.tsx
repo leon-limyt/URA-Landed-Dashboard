@@ -21,16 +21,42 @@ const Filters: React.FC<FiltersProps> = ({ filters, updateFilters, resetFilters,
         updateFilters({ [key]: values });
     };
 
+    const handleDateChange = (field: 'startDate' | 'endDate', value: string) => {
+        if (!value) {
+            updateFilters({ [field]: '' });
+            return;
+        }
+
+        if (field === 'startDate') {
+            updateFilters({ startDate: `${value}-01` });
+        } else {
+            const [year, month] = value.split('-').map(Number);
+            // new Date(year, month, 0) gives the last day of the selected month
+            // because the month in the Date constructor is 0-indexed.
+            const lastDay = new Date(year, month, 0).getDate();
+            const formattedLastDay = String(lastDay).padStart(2, '0');
+            updateFilters({ endDate: `${value}-${formattedLastDay}` });
+        }
+    };
+
     return (
         <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-slate-400 mb-1">Start Date</label>
-                    <FilterInput type="date" value={filters.startDate} onChange={e => updateFilters({ startDate: e.target.value })} />
+                    <FilterInput 
+                        type="month" 
+                        value={filters.startDate ? filters.startDate.slice(0, 7) : ''} 
+                        onChange={e => handleDateChange('startDate', e.target.value)} 
+                    />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-400 mb-1">End Date</label>
-                    <FilterInput type="date" value={filters.endDate} onChange={e => updateFilters({ endDate: e.target.value })} />
+                    <FilterInput 
+                        type="month" 
+                        value={filters.endDate ? filters.endDate.slice(0, 7) : ''} 
+                        onChange={e => handleDateChange('endDate', e.target.value)} 
+                    />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-400 mb-1">Property Type</label>

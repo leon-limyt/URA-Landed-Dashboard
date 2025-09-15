@@ -7,6 +7,7 @@ export const usePropertyData = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [initialDateRange, setInitialDateRange] = useState({ startDate: '', endDate: '' });
+  const [timeAggregation, setTimeAggregation] = useState<'Month' | 'Quarter' | 'Year'>('Month');
   const [filters, setFilters] = useState<Filters>({
     startDate: '',
     endDate: '',
@@ -132,49 +133,82 @@ export const usePropertyData = () => {
     });
     const propertyTypeData = Object.entries(propertyTypeDist).map(([name, value]) => ({ name, value }));
 
-    // --- Time Series Data Generation ---
     if (filteredData.length === 0) {
         return { timeSeriesData: [], propertyTypeData };
     }
 
-    const salesByMonth: { [key: string]: { count: number; totalPsf: number } } = {};
+    const getAggregationKey = (date: Date): string => {
+        const year = date.getUTCFullYear();
+        switch (timeAggregation) {
+            case 'Quarter':
+                const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
+                return `${year}-Q${quarter}`;
+            case 'Year':
+                return year.toString();
+            case 'Month':
+            default:
+                const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+                return `${year}-${month}`;
+        }
+    };
 
-    // 1. Determine the actual date range from the *filtered* data, not the filters.
+    const aggregates: {
+        [key: string]: {
+            totalPsf: number;
+            count: number;
+            types: { [propertyType: string]: number };
+        }
+    } = {};
+
     const dates = filteredData.map(d => d.saleDate.getTime());
     const minDate = new Date(Math.min(...dates));
     const maxDate = new Date(Math.max(...dates));
 
-    // 2. Create a complete timeline of months from the first to the last sale in the filtered data.
     let current = new Date(Date.UTC(minDate.getUTCFullYear(), minDate.getUTCMonth(), 1));
     const endDateForLoop = new Date(Date.UTC(maxDate.getUTCFullYear(), maxDate.getUTCMonth(), 1));
 
     while (current <= endDateForLoop) {
-        const monthKey = current.toISOString().slice(0, 7); // YYYY-MM format
-        salesByMonth[monthKey] = { count: 0, totalPsf: 0 };
-        current.setUTCMonth(current.getUTCMonth() + 1);
+        const key = getAggregationKey(current);
+        if (!aggregates[key]) {
+            aggregates[key] = { totalPsf: 0, count: 0, types: {} };
+            uniquePropertyTypes.forEach(type => {
+                aggregates[key].types[type] = 0;
+            });
+        }
+        
+        if (timeAggregation === 'Month') {
+            current.setUTCMonth(current.getUTCMonth() + 1);
+        } else if (timeAggregation === 'Quarter') {
+            current.setUTCMonth(current.getUTCMonth() + 3);
+        } else { // Year
+            current.setUTCFullYear(current.getUTCFullYear() + 1);
+        }
     }
 
-    // 3. Populate the timeline with actual transaction data.
     filteredData.forEach(d => {
-      const monthKey = d.saleDate.toISOString().slice(0, 7);
-      if (salesByMonth[monthKey]) {
-        salesByMonth[monthKey].count++;
-        salesByMonth[monthKey].totalPsf += d.unitPricePsf;
-      }
+        const key = getAggregationKey(d.saleDate);
+        if (aggregates[key]) {
+            aggregates[key].count++;
+            aggregates[key].totalPsf += d.unitPricePsf;
+            aggregates[key].types[d.propertyType] = (aggregates[key].types[d.propertyType] || 0) + 1;
+        }
     });
 
-    // 4. Format for the chart, ensuring months with no data show as 0.
-    const timeSeriesData = Object.entries(salesByMonth)
-      .map(([month, data]) => ({
-        month,
-        transactions: data.count,
-        avgPricePsf: data.count > 0 ? data.totalPsf / data.count : 0,
-      }))
-      .sort((a, b) => a.month.localeCompare(b.month));
+    const timeSeriesData = Object.entries(aggregates)
+        .map(([period, data]) => ({
+            period,
+            transactions: data.count,
+            avgPricePsf: data.count > 0 ? data.totalPsf / data.count : 0,
+            ...data.types,
+        }))
+        .sort((a, b) => a.period.localeCompare(b.period));
 
     return { timeSeriesData, propertyTypeData };
-  }, [filteredData]);
+  }, [filteredData, uniquePropertyTypes, timeAggregation]);
 
+  const updateTimeAggregation = useCallback((agg: 'Month' | 'Quarter' | 'Year') => {
+    setTimeAggregation(agg);
+  }, []);
 
   const updateFilters = useCallback((newFilters: Partial<Filters>) => {
     setFilters(prev => ({...prev, ...newFilters}));
@@ -201,5 +235,7 @@ export const usePropertyData = () => {
     uniquePropertyTypes,
     uniqueTenures,
     uniqueStreetNames,
+    timeAggregation,
+    updateTimeAggregation,
   };
 };
