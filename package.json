@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "build": "echo 'Build step not required, deploying static files.'"
+  },
   "dependencies": {
     "@google/genai": "^1.22.0"
   }
