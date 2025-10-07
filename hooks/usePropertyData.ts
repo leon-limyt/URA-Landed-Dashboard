@@ -245,8 +245,6 @@ export const usePropertyData = () => {
         setIsAiSummaryLoading(true);
         setAiSummaryError(null);
         
-        const ai = new GoogleGenAI({apiKey: process.env.API_KEY as string});
-
         const { current, previous } = quarterlyKpis;
         const { currentMonth, previousMonth, currentYtd, previousYear } = comparativeMetrics;
 
@@ -308,6 +306,8 @@ ${formatKpiForPrompt(previousYear, 'Last Year')}
         `;
 
         try {
+            const ai = new GoogleGenAI({apiKey: process.env.API_KEY as string});
+
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: prompt,
@@ -317,7 +317,7 @@ ${formatKpiForPrompt(previousYear, 'Last Year')}
 
         } catch (err) {
             console.error("Error generating AI summary:", err);
-            setAiSummaryError("Failed to generate AI summary. Please check your connection or API configuration.");
+            setAiSummaryError("Failed to generate AI summary. This could be due to a network issue or a missing API key in the Vercel project configuration.");
         } finally {
             setIsAiSummaryLoading(false);
         }
