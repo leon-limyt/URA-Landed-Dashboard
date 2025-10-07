@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Transaction, Filters, Kpi, QuarterlyKpiReport } from '../types';
 import { fetchPropertyData } from '../services/propertyDataService';
-import { GoogleGenAI } from '@google/genai';
 
 export const usePropertyData = () => {
   const [allData, setAllData] = useState<Transaction[]>([]);
@@ -306,18 +305,25 @@ ${formatKpiForPrompt(previousYear, 'Last Year')}
         `;
 
         try {
-            const ai = new GoogleGenAI({apiKey: process.env.API_KEY as string});
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
+            const response = await fetch('/api/generateSummary', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ prompt }),
             });
-            
-            setAiSummary(response.text);
 
-        } catch (err) {
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Request failed with status ${response.status}`);
+            }
+
+            const data = await response.json();
+            setAiSummary(data.summary);
+
+        } catch (err: any) {
             console.error("Error generating AI summary:", err);
-            setAiSummaryError("Failed to generate AI summary. This could be due to a network issue or a missing API key in the Vercel project configuration.");
+            setAiSummaryError(`Failed to generate AI summary. This could be due to a network issue or an API key problem in the project configuration. Details: ${err.message}`);
         } finally {
             setIsAiSummaryLoading(false);
         }
