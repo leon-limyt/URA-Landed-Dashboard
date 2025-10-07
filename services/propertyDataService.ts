@@ -1,17 +1,25 @@
 import { RawTransaction, Transaction } from '../types';
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyZ6ctqIY7QRwhcHE8Z_aqAutAi7kNLUb5Oeo-olfE0AGiIhRVr6FDqsmvVCRxJ67vm/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZ6lEYBuuxgv4Uyso9HnPzAz_E_kFjBcvwoUJXMI5eSnPVSIfO6PGI9WvI5vxqd-R-3Q/exec';
 
 const monthMap: { [key: string]: number } = {
-    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
-    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+    'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+    'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
 };
 
-// A robust function to parse numeric values that might be null, undefined, or contain commas.
+// A robust function to parse numeric values that might be null, undefined, or contain commas/currency.
 const parseNumber = (value: any): number => {
-    if (value === null || value === undefined) return 0;
-    const num = Number(String(value).replace(/,/g, ''));
+    if (value === null || value === undefined || value === '' || value === '-') return 0;
+    const num = Number(String(value).replace(/[$,]/g, ''));
     return isNaN(num) ? 0 : num;
+};
+
+const extractStreetName = (fullAddress: string): string => {
+    if (typeof fullAddress !== 'string' || !fullAddress) {
+        return 'N/A';
+    }
+    // Removes leading house number like "8 ", "33 ", "3B ", "527B " etc.
+    return fullAddress.replace(/^\d+[A-Z]*\s+/, '').trim();
 };
 
 export const fetchPropertyData = async (): Promise<Transaction[]> => {
@@ -42,63 +50,58 @@ export const fetchPropertyData = async (): Promise<Transaction[]> => {
     for (const raw of rawData as RawTransaction[]) {
         try {
             const dateStr = raw["Sale Date"];
-            if (typeof dateStr !== 'string' || !dateStr.trim()) {
+            if (typeof dateStr !== 'string' || !dateStr.trim() || dateStr.trim() === '-') {
                 console.warn("Skipping row with empty date", raw);
                 continue;
             }
 
             let saleDate: Date;
 
-            // Attempt to parse as an ISO 8601 string first, as it's a more standard format.
-            const isoDate = new Date(dateStr);
-            if (!isNaN(isoDate.getTime())) {
-                saleDate = isoDate;
+            // Handle ISO format like "2025-02-19T16:00:00.000Z" first
+            if (dateStr.includes('T') && dateStr.includes('Z')) {
+                saleDate = new Date(dateStr);
             } else {
-                // Fallback to the original 'MMM-YY' parsing logic.
+                // Fallback to 'DD-Mon-YY' format like '22-Sep-25'
                 const parts = dateStr.trim().split('-');
-                if (parts.length !== 2) {
-                    console.warn(`Skipping row with invalid date format: "${dateStr}"`, raw);
+                if (parts.length !== 3) {
+                    console.warn(`Skipping row with unhandled date format: "${dateStr}"`, raw);
                     continue;
                 }
                 
-                const monthStr = parts[0].slice(0, 3).toLowerCase();
-                const yearPart = parseInt(parts[1], 10);
+                const day = parseInt(parts[0], 10);
+                const monthStr = parts[1].slice(0, 3).toLowerCase();
+                const yearPart = parseInt(parts[2], 10);
 
                 const monthIndex = monthMap[monthStr];
 
-                if (monthIndex === undefined || isNaN(yearPart)) {
-                    console.warn(`Could not parse month/year from date: "${dateStr}"`, raw);
+                if (monthIndex === undefined || isNaN(day) || isNaN(yearPart)) {
+                    console.warn(`Could not parse DD-Mon-YY date components from: "${dateStr}"`, raw);
                     continue;
                 }
 
                 const fullYear = yearPart < 100 ? 2000 + yearPart : yearPart;
-                const parsedDate = new Date(Date.UTC(fullYear, monthIndex, 1));
-                
-                if (isNaN(parsedDate.getTime())) {
-                    console.warn(`Constructed an invalid date for raw row:`, raw);
-                    continue;
-                }
-                saleDate = parsedDate;
+                saleDate = new Date(Date.UTC(fullYear, monthIndex, day));
             }
-             
+            
             if (isNaN(saleDate.getTime())) {
-                console.warn(`Could not process date string into a valid date: "${dateStr}"`, raw);
+                console.warn(`Constructed an invalid date for raw row:`, raw, ` (date string: "${dateStr}")`);
                 continue;
             }
 
+            const fullAddress = raw["Address"];
             transactions.push({
-                projectName: raw["Project Name"],
-                transactedPrice: parseNumber(raw["Transacted Price ($)"]),
-                areaSqft: parseNumber(raw["Area (SQFT)"]),
-                unitPricePsf: parseNumber(raw["Unit Price ($ PSF)"]),
+                transactedPrice: parseNumber(raw["Sale Price"]),
+                areaSqft: parseNumber(raw["Area (sqft)"]),
+                unitPricePsf: parseNumber(raw["Sale PSF"]),
                 saleDate: saleDate,
                 originalSaleDate: dateStr,
-                streetName: raw["Street Name"],
-                areaSqm: parseNumber(raw["Area (SQM)"]),
-                unitPricePsm: parseNumber(raw["Unit Price ($ PSM)"]),
-                propertyType: raw["Property Type"],
+                fullAddress: fullAddress,
+                streetName: extractStreetName(fullAddress),
+                propertyType: raw["Sub Type"],
                 tenure: raw["Tenure"],
-                postalDistrict: raw["Postal District"],
+                profit: parseNumber(raw["Profit"]),
+                purchasePrice: parseNumber(raw["Purchase Price"]),
+                purchasePsf: parseNumber(raw["Purchase PSF"]),
             });
         } catch (e) {
             console.error("Failed to process row:", raw, e);

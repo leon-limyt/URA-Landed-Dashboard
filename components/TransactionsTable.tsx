@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Transaction } from '../types';
 
@@ -58,11 +57,15 @@ const TransactionsTable: React.FC<{ data: Transaction[] }> = ({ data }) => {
 
     const headers: { key: SortKey, label: string }[] = [
         { key: 'saleDate', label: 'Sale Date' },
-        { key: 'streetName', label: 'Street Name' },
+        // FIX: Changed header to 'Address' and sort key to 'fullAddress' to match displayed content.
+        { key: 'fullAddress', label: 'Address' },
         { key: 'propertyType', label: 'Property Type' },
-        { key: 'transactedPrice', label: 'Price ($)' },
+        { key: 'purchasePrice', label: 'Purchase Price ($)' },
+        { key: 'purchasePsf', label: 'Purchase PSF ($)' },
+        { key: 'transactedPrice', label: 'Sale Price ($)' },
+        { key: 'unitPricePsf', label: 'Sale PSF ($)' },
+        { key: 'profit', label: 'Profit ($)' },
         { key: 'areaSqft', label: 'Area (SQFT)' },
-        { key: 'unitPricePsf', label: 'Price ($ PSF)' },
         { key: 'tenure', label: 'Tenure' },
     ];
 
@@ -83,7 +86,7 @@ const TransactionsTable: React.FC<{ data: Transaction[] }> = ({ data }) => {
                     <thead className="text-xs text-slate-300 uppercase bg-slate-700">
                         <tr>
                             {headers.map(({key, label}) => (
-                                <th key={key} scope="col" className="px-6 py-3 cursor-pointer" onClick={() => requestSort(key)}>
+                                <th key={key} scope="col" className="px-6 py-3 cursor-pointer whitespace-nowrap" onClick={() => requestSort(key)}>
                                     {label} {getSortIndicator(key)}
                                 </th>
                             ))}
@@ -93,11 +96,14 @@ const TransactionsTable: React.FC<{ data: Transaction[] }> = ({ data }) => {
                         {currentTableData.map((item, index) => (
                             <tr key={index} className="bg-slate-800 border-b border-slate-700 hover:bg-slate-600">
                                 <td className="px-6 py-4">{item.originalSaleDate.includes('T') ? item.originalSaleDate.split('T')[0] : item.originalSaleDate}</td>
-                                <td className="px-6 py-4">{item.streetName}</td>
+                                <td className="px-6 py-4">{item.fullAddress}</td>
                                 <td className="px-6 py-4">{item.propertyType}</td>
+                                <td className="px-6 py-4 text-white font-medium">${item.purchasePrice.toLocaleString()}</td>
+                                <td className="px-6 py-4 text-white">${item.purchasePsf.toLocaleString()}</td>
                                 <td className="px-6 py-4 text-white font-medium">${item.transactedPrice.toLocaleString()}</td>
-                                <td className="px-6 py-4">{item.areaSqft.toLocaleString()}</td>
                                 <td className="px-6 py-4 text-white">${item.unitPricePsf.toLocaleString()}</td>
+                                <td className="px-6 py-4 text-white font-medium">${item.profit.toLocaleString()}</td>
+                                <td className="px-6 py-4">{item.areaSqft.toLocaleString()}</td>
                                 <td className="px-6 py-4">{item.tenure}</td>
                             </tr>
                         ))}
