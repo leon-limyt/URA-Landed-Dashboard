@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Transaction, Filters, Kpi, QuarterlyKpiReport } from '../types';
 import { fetchPropertyData } from '../services/propertyDataService';
+import { GoogleGenAI } from '@google/genai';
 
 export const usePropertyData = () => {
   const [allData, setAllData] = useState<Transaction[]>([]);
@@ -244,6 +245,8 @@ export const usePropertyData = () => {
         setIsAiSummaryLoading(true);
         setAiSummaryError(null);
         
+        const ai = new GoogleGenAI({apiKey: process.env.API_KEY as string});
+
         const { current, previous } = quarterlyKpis;
         const { currentMonth, previousMonth, currentYtd, previousYear } = comparativeMetrics;
 
@@ -305,25 +308,16 @@ ${formatKpiForPrompt(previousYear, 'Last Year')}
         `;
 
         try {
-            const response = await fetch('/api/generateSummary', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ prompt }),
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
             });
+            
+            setAiSummary(response.text);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Request failed with status ${response.status}`);
-            }
-
-            const data = await response.json();
-            setAiSummary(data.summary);
-
-        } catch (err: any) {
+        } catch (err) {
             console.error("Error generating AI summary:", err);
-            setAiSummaryError(`Failed to generate AI summary. This could be due to a network issue or an API key problem in the project configuration. Details: ${err.message}`);
+            setAiSummaryError("Failed to generate AI summary. Please check your connection or API configuration.");
         } finally {
             setIsAiSummaryLoading(false);
         }
