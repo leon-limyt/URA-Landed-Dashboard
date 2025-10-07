@@ -1,34 +1,75 @@
 import { GoogleGenAI } from '@google/genai';
 
-// Vercel automatically handles the request and response types.
-// Using `any` for simplicity to avoid adding extra dependencies like `@vercel/node`.
-export default async function handler(req: any, res: any) {
+// This configures the function to run on Vercel's Edge Runtime,
+// which is optimized for low-latency and streaming responses.
+export const config = {
+  runtime: 'edge',
+};
+
+// The handler now uses the standard Request and Response objects.
+export default async function handler(req: Request) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
-  const { prompt } = req.body;
-
-  if (!prompt) {
-    return res.status(400).json({ error: 'A prompt is required in the request body.' });
-  }
-
-  if (!process.env.API_KEY) {
-    console.error('API_KEY environment variable is not set on the server.');
-    return res.status(500).json({ error: 'Server configuration error. The API key is missing.' });
+    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
+    const { prompt } = await req.json();
+
+    if (!prompt) {
+      return new Response(JSON.stringify({ error: 'A prompt is required.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const apiKey = process.env.API_KEY;
+
+    if (!apiKey) {
+      console.error('API_KEY environment variable is not set.');
+      return new Response(JSON.stringify({ error: 'Server configuration error.' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const stream = await ai.models.generateContentStream({
       model: 'gemini-2.5-flash',
       contents: prompt,
+      config: {
+        maxOutputTokens: 1024,
+        thinkingConfig: { thinkingBudget: 512 }
+      },
     });
-    
-    res.status(200).json({ summary: response.text });
+
+    // Create a new ReadableStream to pipe the Gemini response to the client.
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        for await (const chunk of stream) {
+          const text = chunk.text;
+          if (text) {
+            controller.enqueue(encoder.encode(text));
+          }
+        }
+        controller.close();
+      },
+    });
+
+    // Return the stream directly to the client.
+    return new Response(readableStream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
 
   } catch (error) {
-    console.error('Error calling the Gemini API:', error);
-    res.status(500).json({ error: 'An error occurred while communicating with the AI service.' });
+    console.error('Error in generateSummary API:', error);
+    return new Response(JSON.stringify({ error: 'An error occurred with the AI service.' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
