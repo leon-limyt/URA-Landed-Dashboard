@@ -32,6 +32,7 @@ const Dashboard: React.FC = () => {
         resetFilters,
         filteredData,
         kpis,
+        kpiTrends,
         quarterlyKpis,
         chartData,
         uniquePropertyTypes,
@@ -206,11 +207,11 @@ const Dashboard: React.FC = () => {
 
             {/* KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-                <KpiCard title="Total Transactions" value={kpis.totalTransactions.toLocaleString()} />
-                <KpiCard title="Total Sales Volume" value={`$${(kpis.totalSalesVolume / 1_000_000).toFixed(2)}M`} />
-                <KpiCard title="Average Price ($ PSF)" value={`$${Math.round(kpis.averagePricePsf).toLocaleString()}`} />
-                <KpiCard title="Average Profit" value={`$${Math.round(kpis.averageProfit).toLocaleString()}`} />
-                <KpiCard title="Highest Transaction" value={`$${(kpis.highestTransaction / 1_000_000).toFixed(2)}M`} />
+                <KpiCard title="Total Transactions" value={kpis.totalTransactions.toLocaleString()} trend={kpiTrends.totalTransactions} />
+                <KpiCard title="Total Sales Volume" value={`$${(kpis.totalSalesVolume / 1_000_000).toFixed(2)}M`} trend={kpiTrends.totalSalesVolume} />
+                <KpiCard title="Average Price ($ PSF)" value={`$${Math.round(kpis.averagePricePsf).toLocaleString()}`} trend={kpiTrends.averagePricePsf} />
+                <KpiCard title="Average Profit" value={`$${Math.round(kpis.averageProfit).toLocaleString()}`} trend={kpiTrends.averageProfit} />
+                <KpiCard title="Highest Transaction" value={`$${(kpis.highestTransaction / 1_000_000).toFixed(2)}M`} trend={kpiTrends.highestTransaction} />
             </div>
 
             {/* Charts */}

@@ -234,6 +234,26 @@ export const usePropertyData = () => {
     };
   }, [filteredData, calculateKpisForData]);
 
+  const kpiTrends = useMemo(() => {
+    const { currentMonth, previousMonth } = comparativeMetrics;
+
+    const calculateTrend = (current?: number, previous?: number): number | null => {
+        if (current === undefined || current === null || previous === undefined || previous === null || previous === 0) {
+            return null;
+        }
+        if (current === previous) return 0;
+        return ((current - previous) / previous) * 100;
+    };
+
+    return {
+        totalTransactions: calculateTrend(currentMonth?.totalTransactions, previousMonth?.totalTransactions),
+        totalSalesVolume: calculateTrend(currentMonth?.totalSalesVolume, previousMonth?.totalSalesVolume),
+        averagePricePsf: calculateTrend(currentMonth?.averagePricePsf, previousMonth?.averagePricePsf),
+        averageProfit: calculateTrend(currentMonth?.averageProfit, previousMonth?.averageProfit),
+        highestTransaction: calculateTrend(currentMonth?.highestTransaction, previousMonth?.highestTransaction),
+    };
+  }, [comparativeMetrics]);
+
 
   useEffect(() => {
     const generateSummary = async () => {
@@ -446,6 +466,7 @@ ${formatKpiForPrompt(previousYear, 'Last Year')}
     resetFilters,
     filteredData,
     kpis,
+    kpiTrends,
     quarterlyKpis,
     chartData,
     uniquePropertyTypes,
